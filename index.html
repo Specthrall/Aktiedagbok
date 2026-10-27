@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Aktiedagbok</title>
+<meta name="theme-color" content="#f1f2f6" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0e1117" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+:root {
+  --bg: #f1f2f6;
+  --surface: #ffffff;
+  --sunk: #e8eaf1;
+  --line: #dadde7;
+  --ink: #151926;
+  --muted: #5a6175;
+  --accent: #2a43a0;
+  --accent-ink: #ffffff;
+  --buy: #2a43a0;
+  --buy-bg: #e3e8fb;
+  --sell: #a84f14;
+  --sell-bg: #fbeadc;
+  --pos: #1b7745;
+  --neg: #b3261e;
+  --warn-bg: #fff3d6;
+  --warn: #7a5300;
+  --scrim: rgba(15, 18, 28, .45);
+  --f-display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --f-body: "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --f-num: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1117; --surface: #171b24; --sunk: #1f2430; --line: #2b3140; --ink: #e9ebf1; --muted: #9ca3b5;
+    --accent: #93a6ff; --accent-ink: #0e1117; --buy: #9fb0ff; --buy-bg: #232c4d; --sell: #f2a86f; --sell-bg: #3d2a1c;
+    --pos: #63d295; --neg: #ff8b80; --warn-bg: #3a3018; --warn: #f3cf74; --scrim: rgba(0,0,0,.6); color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1117; --surface: #171b24; --sunk: #1f2430; --line: #2b3140; --ink: #e9ebf1; --muted: #9ca3b5;
+  --accent: #93a6ff; --accent-ink: #0e1117; --buy: #9fb0ff; --buy-bg: #232c4d; --sell: #f2a86f; --sell-bg: #3d2a1c;
+  --pos: #63d295; --neg: #ff8b80; --warn-bg: #3a3018; --warn: #f3cf74; --scrim: rgba(0,0,0,.6); color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { background: var(--bg); color: var(--ink); }
+body { font: 15px/1.5 var(--f-body); -webkit-tap-highlight-color: transparent; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.num { font-family: var(--f-num); font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+.pos { color: var(--pos); } .neg { color: var(--neg); }
+
+.wrap { max-width: 560px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+
+.bar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); border-bottom: 1px solid var(--line); }
+.bar .wrap { display: flex; align-items: center; gap: 8px; min-height: 56px; }
+.bar h1 { margin: 0; font: 700 21px/1.1 var(--f-display); letter-spacing: -.02em; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.iconbtn { width: 40px; height: 40px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); display: grid; place-items: center; flex: none; }
+.iconbtn svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.store-note { font-size: 12px; color: var(--muted); }
+
+main { padding-block: 16px 120px; display: grid; gap: 20px; }
+
+.summary { display: grid; gap: 4px; }
+.eyebrow { font-size: 12px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
+.big { font: 500 34px/1.1 var(--f-num); font-variant-numeric: tabular-nums; letter-spacing: -.03em; }
+.sub { color: var(--muted); font-size: 14px; }
+
+.stats { display: grid; grid-template-columns: 1fr 1fr; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.stat { padding: 12px 14px; display: grid; gap: 2px; border-top: 1px solid var(--line); min-width: 0; }
+.stat:nth-child(-n+2) { border-top: 0; }
+.stat:nth-child(odd) { border-right: 1px solid var(--line); }
+.stat .k { font-size: 12px; color: var(--muted); }
+.stat .v { font: 500 17px/1.3 var(--f-num); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.stat.wide { grid-column: 1 / -1; border-right: 0; }
+
+.section-h { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.section-h h2 { margin: 0; font: 700 17px/1.2 var(--f-display); letter-spacing: -.01em; }
+
+.list { display: grid; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.row { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; padding: 14px; border: 0; border-top: 1px solid var(--line); background: none; text-align: left; width: 100%; }
+.row:first-child { border-top: 0; }
+.row:active { background: var(--sunk); }
+.row .name { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.row .right { text-align: right; }
+.row .meta { color: var(--muted); font-size: 13px; }
+.tag { display: inline-block; font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; padding: 1px 6px; border-radius: 5px; background: var(--sunk); color: var(--muted); vertical-align: 2px; margin-left: 6px; }
+
+.entry { display: grid; gap: 6px; padding: 14px; border: 0; border-top: 1px solid var(--line); background: none; text-align: left; width: 100%; }
+.entry:first-child { border-top: 0; }
+.entry:active { background: var(--sunk); }
+.entry .top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.chip { font-size: 12px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; padding: 3px 8px; border-radius: 6px; }
+.chip.buy { color: var(--buy); background: var(--buy-bg); }
+.chip.sell { color: var(--sell); background: var(--sell-bg); }
+.entry .amt { font: 500 17px/1.2 var(--f-num); font-variant-numeric: tabular-nums; }
+.entry .date { margin-left: auto; color: var(--muted); font-size: 13px; }
+.entry dl { margin: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.entry dt { font-size: 11px; color: var(--muted); }
+.entry dd { margin: 0; font: 400 14px/1.3 var(--f-num); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.entry .note { font-size: 13px; color: var(--muted); }
+
+.chart { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 12px 12px 8px; }
+.chart svg { display: block; width: 100%; height: 150px; }
+.chart .cap { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); }
+
+.price-row { display: flex; gap: 8px; align-items: end; }
+.price-row .field { flex: 1; }
+
+.btn { border: 1px solid var(--line); background: var(--surface); border-radius: 12px; padding: 11px 16px; font-weight: 600; min-height: 46px; }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn.danger { color: var(--neg); }
+.btn.danger.armed { background: var(--neg); color: var(--surface); border-color: var(--neg); }
+.btn.block { width: 100%; }
+.btn:disabled { opacity: .5; cursor: default; }
+
+.dock { position: fixed; left: 0; right: 0; bottom: 0; z-index: 4; background: linear-gradient(to top, var(--bg) 70%, transparent); padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px)); padding-top: 20px; }
+.dock .wrap { display: flex; gap: 8px; }
+.dock .btn { flex: 1; }
+
+.empty { background: var(--surface); border: 1px dashed var(--line); border-radius: 14px; padding: 22px 18px; display: grid; gap: 12px; }
+.empty h2 { margin: 0; font: 700 20px/1.2 var(--f-display); text-wrap: balance; }
+.empty p { margin: 0; color: var(--muted); }
+.empty .btns { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.scrim { position: fixed; inset: 0; background: var(--scrim); z-index: 20; }
+.sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 21; max-height: calc(100% - env(safe-area-inset-top, 0px) - 24px); overflow-y: auto; background: var(--surface); border-radius: 18px 18px 0 0; border-top: 1px solid var(--line); padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)); overscroll-behavior: contain; }
+.sheet .wrap { display: grid; gap: 14px; padding-block: 8px 0; }
+.grabber { width: 40px; height: 4px; border-radius: 2px; background: var(--line); margin: 6px auto 0; }
+.sheet-h { display: flex; align-items: center; gap: 8px; }
+.sheet-h h2 { margin: 0; flex: 1; font: 700 20px/1.2 var(--f-display); letter-spacing: -.01em; }
+
+.seg { display: grid; grid-template-columns: 1fr 1fr; background: var(--sunk); border-radius: 12px; padding: 4px; gap: 4px; }
+.seg button { border: 0; background: none; border-radius: 9px; padding: 9px; font-weight: 600; color: var(--muted); }
+.seg button[aria-pressed="true"].buy { background: var(--surface); color: var(--buy); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+.seg button[aria-pressed="true"].sell { background: var(--surface); color: var(--sell); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.field { display: grid; gap: 4px; min-width: 0; }
+.field label { font-size: 13px; font-weight: 500; color: var(--muted); display: flex; gap: 6px; align-items: center; }
+.field input, .field textarea { width: 100%; min-width: 0; border: 1px solid var(--line); background: var(--bg); border-radius: 10px; padding: 11px 12px; font-size: 16px; }
+.field input.n { font-family: var(--f-num); font-variant-numeric: tabular-nums; }
+.field input.auto { border-style: dashed; background: var(--sunk); }
+.autotag { font-size: 10px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); }
+.hint { font-size: 12px; color: var(--muted); }
+
+.preview { background: var(--sunk); border-radius: 12px; padding: 12px 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.preview .k { font-size: 12px; color: var(--muted); }
+.preview .v { font: 500 16px/1.3 var(--f-num); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.warn { background: var(--warn-bg); color: var(--warn); border-radius: 10px; padding: 10px 12px; font-size: 14px; }
+.err { color: var(--neg); font-size: 14px; }
+.sheet-actions { display: flex; gap: 8px; }
+.sheet-actions .primary { flex: 1; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .sheet:not([hidden]) { animation: up .22s ease-out; }
+  @keyframes up { from { transform: translateY(24px); opacity: .6; } to { transform: none; opacity: 1; } }
+}
+a { color: var(--accent); }
+.backup { display: grid; gap: 10px; }
+.backup .btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.backup .btns .btn { flex: 1 1 140px; }
+.version { font-size: 12px; color: var(--muted); text-align: center; }
+</style>
+</head>
+<body>
+
+<header class="bar">
+  <div class="wrap">
+    <button class="iconbtn" id="backBtn" type="button" aria-label="Tillbaka" hidden><svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg></button>
+    <h1 id="barTitle">Aktiedagbok</h1>
+    <button class="iconbtn" id="addStockBtn" type="button" aria-label="Lägg till aktie"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+  </div>
+</header>
+
+<main class="wrap" id="app">
+  <div class="empty">
+    <h2>Laddar din dagbok …</h2>
+    <p>Dina aktier och transaktioner visas här.</p>
+  </div>
+</main>
+
+<script>
+(function () {
+  function show(msg) {
+    var app = document.getElementById("app");
+    if (!app) return;
+    var box = document.createElement("div");
+    box.className = "warn";
+    box.textContent = msg;
+    app.insertBefore(box, app.firstChild);
+  }
+  window.addEventListener("error", function (e) {
+    show("Fel i sidan: " + (e && e.message ? e.message : "okänt fel") + (e && e.lineno ? " (rad " + e.lineno + ")" : ""));
+  });
+  setTimeout(function () {
+    if (!window.__aktiedagbokStarted) show("Sidan startade inte. Ladda om sidan, och hör av dig om felet finns kvar.");
+  }, 6000);
+})();
+</script>
+
+<div class="dock" id="dock" hidden>
+  <div class="wrap"><button class="btn primary" id="newTradeBtn" type="button">Ny transaktion</button></div>
+</div>
+
+<input type="file" id="importFile" accept=".csv,text/csv,text/plain,text/comma-separated-values" hidden>
+<div class="scrim" id="scrim" hidden></div>
+<section class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle" hidden></section>
+
+<script>
+(() => {
+  "use strict";
+  const VERSION = "Version 1 · 27 okt 2026";
+
+  const nf = (min, max) => new Intl.NumberFormat("sv-SE", { minimumFractionDigits: min, maximumFractionDigits: max });
+  const f0 = nf(0, 0), f2 = nf(2, 2), fq = nf(0, 4), fk = nf(0, 2);
+  const kr = (n, dec) => (dec === 0 ? f0 : dec === 2 ? f2 : fk).format(round(n, 2)) + " kr";
+  const krSigned = n => (n > 0.004 ? "+" : "") + kr(n);
+  const st = n => fq.format(round(n, 4)) + " st";
+  const cls = n => n > 0.004 ? "pos" : n < -0.004 ? "neg" : "";
+  const round = (n, d) => { const p = Math.pow(10, d); return Math.round((n + Number.EPSILON) * p) / p; };
+  const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const parseNum = s => { if (s == null) return NaN; const t = String(s).replace(/\s| /g, "").replace(/−/g, "-").replace(",", "."); return t === "" ? NaN : Number(t); };
+  const inNum = n => (Number.isFinite(n) ? String(round(n, 4)).replace(".", ",") : "");
+  const today = () => { const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); };
+  const fmtDate = iso => { if (!iso) return ""; const d = new Date(iso + "T12:00:00"); return d.toLocaleDateString("sv-SE", { day: "numeric", month: "short", year: "numeric" }); };
+  const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+
+  function sortTrades(trades) {
+    return [...trades].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : (a.created || 0) - (b.created || 0)));
+  }
+  // Walks the trades in date order and returns running state after each one.
+  function compute(stock, trades) {
+    const list = sortTrades(trades || stock.trades || []);
+    let shares = Number(stock.startShares) || 0;
+    let cost = Number(stock.startCost) || 0;
+    let balance = -cost;
+    let realized = 0;
+    const rows = [];
+    for (const t of list) {
+      const fee = Number(t.fee) || 0;
+      let oversell = false;
+      if (t.type === "buy") {
+        cost += t.amount + fee;
+        shares += t.qty;
+        balance -= t.amount + fee;
+      } else {
+        const gav = shares > 0 ? cost / shares : 0;
+        if (t.qty > shares + 1e-9) oversell = true;
+        const sold = Math.min(t.qty, Math.max(shares, 0));
+        realized += (t.amount - fee) - gav * sold;
+        cost -= gav * sold;
+        shares -= t.qty;
+        balance += t.amount - fee;
+        if (Math.abs(shares) < 1e-9) { shares = 0; cost = 0; }
+      }
+      rows.push({ t, sharesAfter: shares, balanceAfter: balance, gavAfter: shares > 0 ? cost / shares : 0, realizedAfter: realized, resultAfter: balance + Math.max(shares, 0) * t.price, oversell });
+    }
+    const last = list[list.length - 1];
+    const price = Number(stock.currentPrice) > 0 ? Number(stock.currentPrice) : last ? last.price : 0;
+    const value = Math.max(shares, 0) * price;
+    const gav = shares > 0 ? cost / shares : 0;
+    return {
+      rows, shares, balance, realized, price, value, gav,
+      result: balance + value,
+      unrealized: value - Math.max(shares, 0) * gav,
+      invested: list.filter(t => t.type === "buy").reduce((s, t) => s + t.amount + (Number(t.fee) || 0), 0) + (Number(stock.startCost) || 0),
+      lastDate: last ? last.date : null
+    };
+  }
+
+  const LS_KEY = "aktiedagbok.v1", META_KEY = "aktiedagbok.meta";
+  const store = {
+    mode: "local", stocks: new Map(), listeners: [], meta: { lastExport: null, changedSince: false },
+    onChange(fn) { this.listeners.push(fn); },
+    emit() { this.listeners.forEach(fn => fn()); },
+    load() {
+      try {
+        const raw = localStorage.getItem(LS_KEY);
+        if (raw) JSON.parse(raw).forEach(s => this.stocks.set(s.id, s));
+      } catch (e) { this.mode = "nostorage"; }
+      try { this.meta = Object.assign(this.meta, JSON.parse(localStorage.getItem(META_KEY) || "{}")); } catch (e) { }
+      try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) { }
+      this.emit();
+    },
+    save() {
+      try {
+        localStorage.setItem(LS_KEY, JSON.stringify([...this.stocks.values()]));
+        this.meta.changedSince = true; this.saveMeta();
+      } catch (e) { toast("Kunde inte spara på telefonen. Exportera en säkerhetskopia nu."); }
+    },
+    saveMeta() { try { localStorage.setItem(META_KEY, JSON.stringify(this.meta)); } catch (e) { } },
+    putStock(s) { this.stocks.set(s.id, s); this.save(); this.emit(); },
+    removeStock(id) { this.stocks.delete(id); this.save(); this.emit(); },
+    putTrade(stockId, t) {
+      const s = this.stocks.get(stockId); if (!s) return;
+      this.stocks.set(stockId, { ...s, trades: s.trades.filter(x => x.id !== t.id).concat(t) });
+      this.save(); this.emit();
+    },
+    removeTrade(stockId, id) {
+      const s = this.stocks.get(stockId); if (!s) return;
+      this.stocks.set(stockId, { ...s, trades: s.trades.filter(x => x.id !== id) });
+      this.save(); this.emit();
+    },
+    importStocks(list, replace) {
+      if (replace) this.stocks = new Map();
+      list.forEach(s => {
+        const prev = this.stocks.get(s.id);
+        if (!prev) { this.stocks.set(s.id, s); return; }
+        const byId = new Map(prev.trades.map(t => [t.id, t]));
+        s.trades.forEach(t => byId.set(t.id, t));
+        this.stocks.set(s.id, { ...prev, ...s, trades: [...byId.values()] });
+      });
+      this.save();
+      this.meta.changedSince = false; this.saveMeta();
+      this.emit();
+    }
+  };
+
+
+  const $ = id => document.getElementById(id);
+  const app = $("app");
+  let route = { view: "home" };
+
+  function readRoute() {
+    const h = location.hash.slice(1);
+    route = h.startsWith("s-") && store.stocks.has(h.slice(2)) ? { view: "stock", id: h.slice(2) } : { view: "home" };
+  }
+  function go(hash) {
+    if (location.hash.slice(1) === hash) { closeSheet(); render(); window.scrollTo(0, 0); }
+    else location.hash = hash;
+  }
+
+  function render() {
+    readRoute();
+    if (route.view === "stock") renderStock(store.stocks.get(route.id));
+    else renderHome();
+  }
+
+  function storeNote() {
+    return store.mode === "nostorage"
+      ? "Webbläsaren tillåter inte att sidan sparar data. Exportera innan du stänger."
+      : "Sparas på den här telefonen.";
+  }
+  function daysAgo(iso) { return iso ? Math.floor((Date.now() - new Date(iso).getTime()) / 86400000) : null; }
+  function backupHtml(hasData) {
+    const d = daysAgo(store.meta.lastExport);
+    const when = d === null ? "Du har inte exporterat någon säkerhetskopia än." : d === 0 ? "Senaste säkerhetskopian gjordes i dag." : d === 1 ? "Senaste säkerhetskopian gjordes i går." : `Senaste säkerhetskopian gjordes för ${d} dagar sedan.`;
+    return `
+      <section class="backup" aria-label="Säkerhetskopia">
+        <div class="section-h"><h2>Säkerhetskopia</h2></div>
+        <p class="sub" style="margin:0">${esc(when)} Exportera en CSV-fil och spara den i Google Drive. Den går att öppna i Google Kalkylark och att importera hit igen.</p>
+        <div class="btns">
+          ${hasData ? '<button class="btn" type="button" data-act="export">Exportera CSV</button>' : ""}
+          <button class="btn" type="button" data-act="import">Importera CSV</button>
+        </div>
+      </section>`;
+  }
+  function backupNag() {
+    if (!store.stocks.size || !store.meta.changedSince) return "";
+    const d = daysAgo(store.meta.lastExport);
+    if (d !== null && d < 7) return "";
+    return `<div class="warn">${d === null ? "Du har ingen säkerhetskopia än." : `Det har gått ${d} dagar sedan din senaste säkerhetskopia.`} Tryck på Exportera CSV längst ner.</div>`;
+  }
+
+  function renderHome() {
+    $("barTitle").textContent = "Aktiedagbok";
+    $("backBtn").hidden = true;
+    $("addStockBtn").hidden = false;
+    $("dock").hidden = true;
+    const stocks = [...store.stocks.values()].sort((a, b) => a.name.localeCompare(b.name, "sv"));
+    if (!stocks.length) {
+      app.innerHTML = `
+        <div class="empty">
+          <h2>Börja med din första aktie</h2>
+          <p>Lägg till en aktie och fyll sedan i dina köp och sälj. Antal ägda aktier, GAV och balans sedan start räknas ut automatiskt.</p>
+          <div class="btns">
+            <button class="btn primary" type="button" data-act="new-stock">Lägg till aktie</button>
+            <button class="btn" type="button" data-act="example">Visa ett exempel</button>
+          </div>
+        </div>
+        <p class="store-note">${storeNote()}</p>
+        ${backupHtml(false)}
+        <p class="version">${VERSION}</p>`;
+      return;
+    }
+    const calc = stocks.map(s => ({ s, c: compute(s) }));
+    const tot = calc.reduce((a, { c }) => ({ balance: a.balance + c.balance, value: a.value + c.value, result: a.result + c.result, realized: a.realized + c.realized }), { balance: 0, value: 0, result: 0, realized: 0 });
+    app.innerHTML = `
+      ${backupNag()}
+      <section class="summary" aria-label="Översikt">
+        <span class="eyebrow">Resultat, alla aktier</span>
+        <span class="big ${cls(tot.result)}">${esc(krSigned(tot.result))}</span>
+        <span class="sub">Balans sedan start plus innehavets värde i dag.</span>
+      </section>
+      <div class="stats">
+        <div class="stat"><span class="k">Balans sedan start</span><span class="v ${cls(tot.balance)}">${esc(kr(tot.balance, 0))}</span></div>
+        <div class="stat"><span class="k">Innehavets värde</span><span class="v">${esc(kr(tot.value, 0))}</span></div>
+        <div class="stat wide"><span class="k">Realiserad vinst/förlust</span><span class="v ${cls(tot.realized)}">${esc(krSigned(tot.realized))}</span></div>
+      </div>
+      <div class="section-h"><h2>Dina aktier</h2><span class="store-note">${stocks.length} st</span></div>
+      <div class="list">
+        ${calc.map(({ s, c }) => `
+          <button class="row" type="button" data-open="${esc(s.id)}">
+            <span class="name">${esc(s.name)}${s.example ? '<span class="tag">Exempel</span>' : ""}</span>
+            <span class="right num ${cls(c.result)}">${esc(krSigned(c.result))}</span>
+            <span class="meta">${esc(st(c.shares))} · ${s.trades.length} transaktioner</span>
+            <span class="meta right">${c.lastDate ? esc(fmtDate(c.lastDate)) : "Inga affärer"}</span>
+          </button>`).join("")}
+      </div>
+      <p class="store-note">${storeNote()}</p>
+      ${backupHtml(true)}
+      <p class="version">${VERSION}</p>`;
+  }
+
+  function renderStock(s) {
+    $("barTitle").textContent = s.name;
+    $("backBtn").hidden = false;
+    $("addStockBtn").hidden = true;
+    $("dock").hidden = false;
+    const c = compute(s);
+    const rows = [...c.rows].reverse();
+    const lastPrice = c.rows.length ? c.rows[c.rows.length - 1].t.price : 0;
+    app.innerHTML = `
+      ${s.example ? '<div class="warn">Det här är påhittade exempeldata. Ta bort aktien längst ner när du har testat klart.</div>' : ""}
+      <section class="summary" aria-label="Resultat">
+        <span class="eyebrow">Resultat${s.ticker ? " · " + esc(s.ticker) : ""}</span>
+        <span class="big ${cls(c.result)}">${esc(krSigned(c.result))}</span>
+        <span class="sub">${c.price ? "Räknat på kursen " + esc(kr(c.price, 2)) : "Lägg in en transaktion för att se resultatet."}</span>
+      </section>
+      <div class="stats">
+        <div class="stat"><span class="k">Antal aktier ägda</span><span class="v">${esc(st(c.shares))}</span></div>
+        <div class="stat"><span class="k">Balans sedan start</span><span class="v ${cls(c.balance)}">${esc(kr(c.balance))}</span></div>
+        <div class="stat"><span class="k">GAV (snittpris)</span><span class="v">${c.shares > 0 ? esc(kr(c.gav, 2)) : "–"}</span></div>
+        <div class="stat"><span class="k">Innehavets värde</span><span class="v">${esc(kr(c.value))}</span></div>
+        <div class="stat"><span class="k">Orealiserat</span><span class="v ${cls(c.unrealized)}">${c.shares > 0 ? esc(krSigned(c.unrealized)) : "–"}</span></div>
+        <div class="stat"><span class="k">Realiserat</span><span class="v ${cls(c.realized)}">${esc(krSigned(c.realized))}</span></div>
+      </div>
+      <div class="price-row">
+        <div class="field">
+          <label for="curPrice">Aktuell kurs (kr)</label>
+          <input class="n" id="curPrice" inputmode="decimal" autocomplete="off" placeholder="${esc(inNum(lastPrice))}" value="${Number(s.currentPrice) > 0 ? esc(inNum(s.currentPrice)) : ""}">
+        </div>
+        <button class="btn" type="button" data-act="save-price">Uppdatera</button>
+      </div>
+      <p class="hint" style="margin:-12px 0 0">${Number(s.currentPrice) > 0 ? "Uppdaterad " + esc(fmtDate(s.currentPriceDate)) + ". Töm fältet för att använda senaste transaktionens kurs." : "Utan aktuell kurs används kursen från din senaste transaktion."}</p>
+      ${c.rows.length >= 2 ? `<div class="chart" id="chart" aria-label="Resultat efter varje transaktion"></div>` : ""}
+      <div class="section-h"><h2>Historik</h2><span class="store-note">Tryck på en rad för att ändra</span></div>
+      ${rows.length ? `<div class="list">${rows.map(r => entryHtml(r)).join("")}</div>` : `<div class="empty"><p>Inga transaktioner än. Tryck på <b>Ny transaktion</b> för att lägga in ditt första köp.</p></div>`}
+      ${(Number(s.startShares) || 0) > 0 ? `<p class="hint">Startinnehav: ${esc(st(s.startShares))}${Number(s.startCost) ? " för " + esc(kr(s.startCost)) : ""}.</p>` : ""}
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn" type="button" data-act="edit-stock">Ändra aktie</button>
+        <button class="btn danger" type="button" data-act="del-stock">Ta bort aktie</button>
+      </div>`;
+    if (c.rows.length >= 2) drawChart($("chart"), c);
+  }
+
+  function entryHtml(r) {
+    const t = r.t, buy = t.type === "buy";
+    return `
+      <button class="entry" type="button" data-trade="${esc(t.id)}">
+        <span class="top">
+          <span class="chip ${buy ? "buy" : "sell"}">${buy ? "Köp" : "Sälj"}</span>
+          <span class="amt">${esc(kr(t.amount))} <span style="color:var(--muted)">(${esc(fq.format(round(t.qty, 4)))} st)</span></span>
+          <span class="date">${esc(fmtDate(t.date))}</span>
+        </span>
+        <dl>
+          <div><dt>Kurs</dt><dd>${esc(kr(t.price, 2))}</dd></div>
+          <div><dt>Ägda efter</dt><dd>${esc(st(r.sharesAfter))}</dd></div>
+          <div><dt>Balans sedan start</dt><dd class="${cls(r.balanceAfter)}">${esc(kr(r.balanceAfter))}</dd></div>
+        </dl>
+        ${Number(t.fee) ? `<span class="note">Courtage ${esc(kr(t.fee))}</span>` : ""}
+        ${r.oversell ? `<span class="note neg">Sålde fler aktier än du ägde enligt historiken.</span>` : ""}
+        ${t.note ? `<span class="note">${esc(t.note)}</span>` : ""}
+      </button>`;
+  }
+
+  function drawChart(el, c) {
+    const pts = c.rows.map(r => ({ y: r.resultAfter, d: r.t.date }));
+    if (Number(c.price) > 0 && Math.abs(pts[pts.length - 1].y - c.result) > 0.005) pts.push({ y: c.result, d: "nu" });
+    const W = Math.max(260, el.clientWidth - 24), H = 150, padL = 4, padR = 4, padT = 18, padB = 18;
+    let lo = Math.min(0, ...pts.map(p => p.y)), hi = Math.max(0, ...pts.map(p => p.y));
+    if (hi - lo < 1) { hi += 1; lo -= 1; }
+    const x = i => padL + (pts.length === 1 ? 0 : i * (W - padL - padR) / (pts.length - 1));
+    const y = v => padT + (hi - v) * (H - padT - padB) / (hi - lo);
+    const line = pts.map((p, i) => (i ? "L" : "M") + x(i).toFixed(1) + " " + y(p.y).toFixed(1)).join(" ");
+    const area = line + ` L${x(pts.length - 1).toFixed(1)} ${y(0).toFixed(1)} L${x(0).toFixed(1)} ${y(0).toFixed(1)} Z`;
+    const end = pts[pts.length - 1];
+    const col = end.y >= 0 ? "var(--pos)" : "var(--neg)";
+    const maxI = pts.reduce((b, p, i) => (p.y > pts[b].y ? i : b), 0);
+    const minI = pts.reduce((b, p, i) => (p.y < pts[b].y ? i : b), 0);
+    const lbl = (i, above) => {
+      const anchor = i === 0 ? "start" : i === pts.length - 1 ? "end" : "middle";
+      return `<text x="${x(i).toFixed(1)}" y="${(y(pts[i].y) + (above ? -6 : 14)).toFixed(1)}" text-anchor="${anchor}" font-size="11" font-family="IBM Plex Mono, monospace" fill="var(--muted)">${esc(kr(pts[i].y, 0))}</text>`;
+    };
+    el.innerHTML = `
+      <div class="cap"><span>Resultat efter varje transaktion</span><span class="num ${cls(end.y)}">${esc(krSigned(end.y))}</span></div>
+      <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Linjediagram över resultatet">
+        <line x1="0" x2="${W}" y1="${y(0).toFixed(1)}" y2="${y(0).toFixed(1)}" stroke="var(--line)" stroke-width="1" stroke-dasharray="3 3"/>
+        <path d="${area}" fill="${col}" fill-opacity=".12" stroke="none"/>
+        <path d="${line}" fill="none" stroke="${col}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+        <circle cx="${x(pts.length - 1).toFixed(1)}" cy="${y(end.y).toFixed(1)}" r="4" fill="${col}" stroke="var(--surface)" stroke-width="2"/>
+        ${maxI !== minI ? lbl(maxI, true) + lbl(minI, false) : ""}
+      </svg>
+      <div class="cap"><span>${esc(fmtDate(pts[0].d))}</span><span>${end.d === "nu" ? "Nu" : esc(fmtDate(end.d))}</span></div>`;
+  }
+
+  const sheet = $("sheet"), scrim = $("scrim");
+  let sheetCtx = null;
+  function openSheet(html, ctx) {
+    sheetCtx = ctx;
+    sheet.innerHTML = `<div class="grabber"></div><div class="wrap">${html}</div>`;
+    sheet.hidden = false; scrim.hidden = false;
+    document.body.style.overflow = "hidden";
+    sheet.scrollTop = 0;
+  }
+  function closeSheet() { sheet.hidden = true; scrim.hidden = true; sheet.innerHTML = ""; sheetCtx = null; document.body.style.overflow = ""; }
+  scrim.addEventListener("click", closeSheet);
+  document.addEventListener("keydown", e => { if (e.key === "Escape" && !sheet.hidden) closeSheet(); });
+
+  const head = title => `<div class="sheet-h"><h2 id="sheetTitle">${esc(title)}</h2><button class="iconbtn" type="button" data-act="close" aria-label="Stäng"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>`;
+
+  function stockSheet(existing) {
+    const s = existing || {};
+    openSheet(`
+      ${head(existing ? "Ändra aktie" : "Ny aktie")}
+      <form id="stockForm" class="grid2" style="gap:14px" novalidate>
+        <div class="field" style="grid-column:1/-1"><label for="sName">Namn</label><input id="sName" required autocomplete="off" placeholder="t.ex. Volvo B" value="${esc(s.name || "")}"></div>
+        <div class="field" style="grid-column:1/-1"><label for="sTicker">Kortnamn (valfritt)</label><input id="sTicker" autocomplete="off" autocapitalize="characters" placeholder="VOLV B" value="${esc(s.ticker || "")}"></div>
+        <div class="field"><label for="sStartShares">Ägda vid start</label><input class="n" id="sStartShares" inputmode="decimal" placeholder="0" value="${s.startShares ? esc(inNum(s.startShares)) : ""}"></div>
+        <div class="field"><label for="sStartCost">Kostade totalt (kr)</label><input class="n" id="sStartCost" inputmode="decimal" placeholder="0" value="${s.startCost ? esc(inNum(s.startCost)) : ""}"></div>
+        <p class="hint" style="grid-column:1/-1;margin:0">Äger du redan aktier innan du börjar logga? Fyll i hur många och vad de kostade, så blir antal, GAV och balans rätt från början.</p>
+        <p class="err" id="stockErr" style="grid-column:1/-1;margin:0" hidden></p>
+        <button class="btn primary" type="submit" style="grid-column:1/-1">${existing ? "Spara ändringar" : "Lägg till aktie"}</button>
+      </form>`, { kind: "stock", id: s.id });
+    if (!existing) setTimeout(() => $("sName")?.focus(), 50);
+  }
+
+  function saveStockForm() {
+    const name = $("sName").value.trim();
+    if (!name) { const e = $("stockErr"); e.textContent = "Skriv ett namn på aktien."; e.hidden = false; return; }
+    const ss = parseNum($("sStartShares").value), sc = parseNum($("sStartCost").value);
+    if ((!isNaN(ss) && ss < 0) || (!isNaN(sc) && sc < 0)) { const e = $("stockErr"); e.textContent = "Startvärden kan inte vara negativa."; e.hidden = false; return; }
+    const prev = sheetCtx.id ? store.stocks.get(sheetCtx.id) : null;
+    const s = prev ? { ...prev } : { id: uid(), trades: [], created: Date.now() };
+    s.name = name;
+    s.ticker = $("sTicker").value.trim().toUpperCase();
+    s.startShares = isNaN(ss) ? 0 : ss;
+    s.startCost = isNaN(sc) ? 0 : sc;
+    store.putStock(s);
+    closeSheet();
+    go("s-" + s.id);
+  }
+
+  let tf = null; // form state
+  function tradeSheet(stock, trade) {
+    const c = compute(stock);
+    const lastPrice = c.rows.length ? c.rows[c.rows.length - 1].t.price : 0;
+    const seedPrice = trade ? trade.price : (Number(stock.currentPrice) > 0 ? Number(stock.currentPrice) : lastPrice);
+    tf = {
+      stockId: stock.id, editId: trade?.id || null,
+      type: trade?.type || "buy",
+      order: trade ? ["qty", "price"] : (seedPrice ? ["price"] : []),
+      vals: { amount: trade?.amount ?? NaN, qty: trade?.qty ?? NaN, price: seedPrice || NaN },
+      armed: false
+    };
+    openSheet(`
+      ${head(trade ? "Ändra transaktion" : "Ny transaktion")}
+      <p class="hint" style="margin:-8px 0 0">${esc(stock.name)}</p>
+      <div class="seg" role="group" aria-label="Typ">
+        <button type="button" class="buy" data-type="buy" aria-pressed="${tf.type === "buy"}">Köp</button>
+        <button type="button" class="sell" data-type="sell" aria-pressed="${tf.type === "sell"}">Sälj</button>
+      </div>
+      <form id="tradeForm" style="display:grid;gap:14px" novalidate>
+        <div class="field">
+          <label for="tAmount" id="lAmount"><span id="amountLbl">Köpte för (kr)</span><span class="autotag" data-auto="amount" hidden>Auto</span></label>
+          <input class="n" id="tAmount" data-f="amount" inputmode="decimal" autocomplete="off" placeholder="4 000">
+        </div>
+        <div class="grid2">
+          <div class="field">
+            <label for="tQty">Antal aktier <span class="autotag" data-auto="qty" hidden>Auto</span></label>
+            <input class="n" id="tQty" data-f="qty" inputmode="decimal" autocomplete="off" placeholder="400">
+          </div>
+          <div class="field">
+            <label for="tPrice">Kurs (kr) <span class="autotag" data-auto="price" hidden>Auto</span></label>
+            <input class="n" id="tPrice" data-f="price" inputmode="decimal" autocomplete="off" placeholder="10,00">
+          </div>
+        </div>
+        <p class="hint" style="margin:-6px 0 0">Fyll i två av tre fält, så räknas det tredje ut.${!trade && seedPrice ? " Kursen är förifylld från " + (Number(stock.currentPrice) > 0 ? "aktuell kurs" : "din senaste transaktion") + "." : ""}</p>
+        <div class="grid2">
+          <div class="field"><label for="tDate">Datum</label><input id="tDate" type="date" value="${esc(trade?.date || today())}"></div>
+          <div class="field"><label for="tFee">Courtage (kr)</label><input class="n" id="tFee" inputmode="decimal" autocomplete="off" placeholder="0" value="${trade && Number(trade.fee) ? esc(inNum(trade.fee)) : ""}"></div>
+        </div>
+        <div class="field"><label for="tNote">Anteckning (valfritt)</label><input id="tNote" autocomplete="off" placeholder="Varför gjorde du affären?" value="${esc(trade?.note || "")}"></div>
+        <div class="preview" id="tPreview" aria-live="polite"></div>
+        <div class="warn" id="tWarn" hidden></div>
+        <p class="err" id="tErr" hidden></p>
+        <div class="sheet-actions">
+          ${trade ? `<button class="btn danger" type="button" data-act="del-trade">Ta bort</button>` : ""}
+          <button class="btn primary" type="submit">${trade ? "Spara ändringar" : "Spara transaktion"}</button>
+        </div>
+      </form>`, { kind: "trade" });
+    syncTradeInputs(true);
+    updateTradePreview();
+  }
+
+  const FIELDS = ["amount", "qty", "price"];
+  const inputFor = f => ({ amount: $("tAmount"), qty: $("tQty"), price: $("tPrice") }[f]);
+  function autoField() {
+    if (tf.order.length < 2) return null;
+    const lastTwo = tf.order.slice(-2);
+    return FIELDS.find(f => !lastTwo.includes(f));
+  }
+  function recomputeAuto() {
+    const a = autoField();
+    if (!a) return;
+    const v = tf.vals;
+    if (a === "amount") v.amount = v.qty > 0 && v.price > 0 ? round(v.qty * v.price, 2) : NaN;
+    if (a === "qty") v.qty = v.amount > 0 && v.price > 0 ? round(v.amount / v.price, 4) : NaN;
+    if (a === "price") v.price = v.amount > 0 && v.qty > 0 ? round(v.amount / v.qty, 4) : NaN;
+  }
+  function syncTradeInputs(all) {
+    const a = autoField();
+    FIELDS.forEach(f => {
+      const el = inputFor(f);
+      const isAuto = f === a;
+      el.classList.toggle("auto", isAuto);
+      sheet.querySelector(`[data-auto="${f}"]`).hidden = !isAuto;
+      if (all || isAuto) el.value = inNum(tf.vals[f]);
+    });
+    $("amountLbl").textContent = tf.type === "buy" ? "Köpte för (kr)" : "Sålde för (kr)";
+    sheet.querySelectorAll("[data-type]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.type === tf.type)));
+  }
+  function draftTrade() {
+    const v = tf.vals;
+    return {
+      id: tf.editId || uid(), type: tf.type, amount: v.amount, qty: v.qty, price: v.price,
+      fee: Math.max(0, parseNum($("tFee").value) || 0), date: $("tDate").value || today(),
+      note: $("tNote").value.trim()
+    };
+  }
+  function updateTradePreview() {
+    const stock = store.stocks.get(tf.stockId);
+    const el = $("tPreview"), warn = $("tWarn");
+    if (!stock) return;
+    const d = draftTrade();
+    const ok = d.amount > 0 && d.qty > 0 && d.price > 0;
+    if (!ok) {
+      const c = compute(stock);
+      el.innerHTML = `<div><div class="k">Ägda nu</div><div class="v">${esc(st(c.shares))}</div></div><div><div class="k">Balans nu</div><div class="v ${cls(c.balance)}">${esc(kr(c.balance))}</div></div>`;
+      warn.hidden = true;
+      return;
+    }
+    const existing = stock.trades.find(t => t.id === d.id);
+    d.created = existing?.created || Date.now();
+    const trades = stock.trades.filter(t => t.id !== d.id).concat(d);
+    const c = compute(stock, trades);
+    const r = c.rows.find(x => x.t.id === d.id);
+    el.innerHTML = `
+      <div><div class="k">Ägda efter avslut</div><div class="v">${esc(st(r.sharesAfter))}</div></div>
+      <div><div class="k">Balans sedan start</div><div class="v ${cls(r.balanceAfter)}">${esc(kr(r.balanceAfter))}</div></div>
+      ${d.type === "sell" && r.oversell === false ? `<div style="grid-column:1/-1"><div class="k">Vinst/förlust på försäljningen</div><div class="v ${cls(r.realizedAfter - (c.rows[c.rows.indexOf(r) - 1]?.realizedAfter || 0))}">${esc(krSigned(r.realizedAfter - (c.rows[c.rows.indexOf(r) - 1]?.realizedAfter || 0)))}</div></div>` : ""}`;
+    const later = c.rows.indexOf(r) < c.rows.length - 1;
+    const msgs = [];
+    if (r.oversell) msgs.push("Du säljer fler aktier än historiken säger att du äger. Lägg till ett startinnehav under Ändra aktie om du ägde aktier innan du började logga.");
+    if (later) msgs.push("Datumet ligger före senare transaktioner. De räknas om automatiskt.");
+    warn.textContent = msgs.join(" ");
+    warn.hidden = !msgs.length;
+  }
+  function saveTradeForm() {
+    const err = $("tErr");
+    const d = draftTrade();
+    if (!(d.amount > 0 && d.qty > 0 && d.price > 0)) { err.textContent = "Fyll i minst två av belopp, antal och kurs med tal större än noll."; err.hidden = false; return; }
+    const stock = store.stocks.get(tf.stockId);
+    const existing = stock.trades.find(t => t.id === d.id);
+    d.created = existing?.created || Date.now();
+    store.putTrade(tf.stockId, d);
+    closeSheet();
+    render();
+    toast(existing ? "Transaktionen är uppdaterad" : (d.type === "buy" ? "Köpet är sparat" : "Försäljningen är sparad"));
+  }
+
+  let toastEl = null, toastT = 0;
+  function toast(msg) {
+    if (!toastEl) {
+      toastEl = document.createElement("div");
+      toastEl.setAttribute("role", "status");
+      toastEl.style.cssText = "position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom,0px));z-index:30;background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:14px;max-width:calc(100% - 32px);text-align:center";
+      document.body.appendChild(toastEl);
+    }
+    toastEl.textContent = msg; toastEl.hidden = false;
+    clearTimeout(toastT); toastT = setTimeout(() => { toastEl.hidden = true; }, 2600);
+  }
+
+  function addExample() {
+    const mk = (type, amount, qty, price, date, i, note) => ({ id: uid(), type, amount, qty, price, fee: 0, date, note: note || "", created: Date.now() + i });
+    const s = {
+      id: uid(), name: "Exempel AB", ticker: "EXMP", example: true, created: Date.now(), startShares: 0, startCost: 0,
+      trades: [
+        mk("buy", 2000, 200, 10, "2026-03-02", 0, "Första köpet"),
+        mk("buy", 2400, 200, 12, "2026-05-14", 1),
+        mk("sell", 1500, 100, 15, "2026-07-08", 2, "Tog hem lite vinst"),
+        mk("buy", 1100, 100, 11, "2026-09-21", 3)
+      ]
+    };
+    store.putStock(s);
+    go("s-" + s.id);
+  }
+
+  const CSV_HEAD = ["Rad", "Aktie-ID", "Aktie", "Kortnamn", "Ägda vid start", "Kostnad vid start", "Aktuell kurs", "Kurs uppdaterad", "Transaktions-ID", "Typ", "Datum", "Belopp", "Antal", "Kurs", "Courtage", "Anteckning", "Skapad"];
+  function toCsv() {
+    const n = v => (v === null || v === undefined || v === "" || !isFinite(Number(v))) ? "" : String(Number(v)).replace(".", ",");
+    const txt = v => { const s = String(v ?? ""); return /^[=+\-@]/.test(s) ? "'" + s : s; };
+    const q = v => { const s = String(v ?? ""); return /[;"\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+    const lines = [CSV_HEAD];
+    [...store.stocks.values()].sort((a, b) => a.name.localeCompare(b.name, "sv")).forEach(s => {
+      lines.push(["Aktie", s.id, txt(s.name), txt(s.ticker), n(s.startShares), n(s.startCost), n(s.currentPrice), s.currentPriceDate || "", "", "", "", "", "", "", "", "", n(s.created)]);
+      sortTrades(s.trades).forEach(t => lines.push(["Affär", s.id, txt(s.name), txt(s.ticker), "", "", "", "", t.id, t.type === "sell" ? "Sälj" : "Köp", t.date, n(t.amount), n(t.qty), n(t.price), n(t.fee), txt(t.note), n(t.created)]));
+    });
+    return "﻿" + lines.map(r => r.map(q).join(";")).join("\r\n") + "\r\n";
+  }
+  async function exportCsv() {
+    const name = "aktiedagbok-" + today() + ".csv";
+    const file = new File([toCsv()], name, { type: "text/csv" });
+    let done = false;
+    try {
+      if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: name }); done = true; }
+    } catch (e) { if (e && e.name === "AbortError") return; }
+    if (!done) {
+      const url = URL.createObjectURL(file);
+      const a = document.createElement("a");
+      a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+    }
+    store.meta.lastExport = new Date().toISOString(); store.meta.changedSince = false; store.saveMeta();
+    render();
+    toast("Säkerhetskopian är exporterad");
+  }
+  function parseCsv(text) {
+    text = text.replace(/^﻿/, "");
+    const first = text.split(/\r?\n/, 1)[0];
+    const sep = (first.match(/;/g) || []).length >= (first.match(/,/g) || []).length ? ";" : ",";
+    const rows = []; let row = [], cur = "", inQ = false;
+    for (let i = 0; i < text.length; i++) {
+      const c = text[i];
+      if (inQ) { if (c === '"') { if (text[i + 1] === '"') { cur += '"'; i++; } else inQ = false; } else cur += c; }
+      else if (c === '"') inQ = true;
+      else if (c === sep) { row.push(cur); cur = ""; }
+      else if (c === "\n" || c === "\r") { if (c === "\r" && text[i + 1] === "\n") i++; row.push(cur); rows.push(row); row = []; cur = ""; }
+      else cur += c;
+    }
+    if (cur !== "" || row.length) { row.push(cur); rows.push(row); }
+    return rows.filter(r => r.some(x => x.trim() !== ""));
+  }
+  function fromCsv(text) {
+    const rows = parseCsv(text);
+    if (rows.length < 2) throw new Error("Filen innehåller inga rader.");
+    const head = rows[0].map(h => h.trim());
+    if (!head.includes("Rad") || !head.includes("Aktie-ID")) throw new Error("Filen ser inte ut som en export från Aktiedagbok.");
+    const get = (r, k) => { const i = head.indexOf(k); return i < 0 ? "" : String(r[i] ?? "").trim(); };
+    const unq = s => s.replace(/^'(?=[=+\-@])/, "");
+    const num = s => { const v = parseNum(s); return isNaN(v) ? null : v; };
+    const date = s => { const m = String(s).match(/^(\d{4}-\d{2}-\d{2})/); return m ? m[1] : null; };
+    const stocks = new Map();
+    rows.slice(1).forEach((r, i) => {
+      const sid = get(r, "Aktie-ID"); if (!sid) return;
+      if (!stocks.has(sid)) stocks.set(sid, { id: sid, name: unq(get(r, "Aktie")) || "Namnlös aktie", ticker: unq(get(r, "Kortnamn")), startShares: 0, startCost: 0, trades: [], created: Date.now() });
+      const s = stocks.get(sid);
+      if (get(r, "Rad").toLowerCase() === "aktie") {
+        s.name = unq(get(r, "Aktie")) || s.name; s.ticker = unq(get(r, "Kortnamn"));
+        s.startShares = num(get(r, "Ägda vid start")) || 0; s.startCost = num(get(r, "Kostnad vid start")) || 0;
+        const cp = num(get(r, "Aktuell kurs"));
+        if (cp > 0) { s.currentPrice = cp; s.currentPriceDate = get(r, "Kurs uppdaterad"); }
+        s.created = num(get(r, "Skapad")) || s.created;
+        return;
+      }
+      const t = {
+        id: get(r, "Transaktions-ID") || uid(), type: get(r, "Typ").toLowerCase().startsWith("s") ? "sell" : "buy",
+        date: date(get(r, "Datum")), amount: num(get(r, "Belopp")), qty: num(get(r, "Antal")), price: num(get(r, "Kurs")),
+        fee: num(get(r, "Courtage")) || 0, note: unq(get(r, "Anteckning")), created: num(get(r, "Skapad")) || Date.now() + i
+      };
+      if (!(t.amount > 0) && t.qty > 0 && t.price > 0) t.amount = round(t.qty * t.price, 2);
+      if (!(t.qty > 0) && t.amount > 0 && t.price > 0) t.qty = round(t.amount / t.price, 4);
+      if (!(t.price > 0) && t.amount > 0 && t.qty > 0) t.price = round(t.amount / t.qty, 4);
+      if (!(t.amount > 0 && t.qty > 0 && t.price > 0) || !t.date) throw new Error(`Rad ${i + 2} saknar datum eller två av belopp, antal och kurs.`);
+      s.trades.push(t);
+    });
+    return [...stocks.values()];
+  }
+  let pendingImport = null;
+  $("importFile").addEventListener("change", e => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      let list;
+      try { list = fromCsv(String(reader.result || "")); }
+      catch (err) { toast(err.message || "Kunde inte läsa filen."); return; }
+      pendingImport = list;
+      const trades = list.reduce((a, s) => a + s.trades.length, 0);
+      openSheet(`
+        ${head("Importera säkerhetskopia")}
+        <p>Filen innehåller <b>${list.length} ${list.length === 1 ? "aktie" : "aktier"}</b> och <b>${trades} ${trades === 1 ? "affär" : "affärer"}</b>.</p>
+        <p class="sub" style="margin:0">Slå ihop behåller det du redan har och lägger till eller uppdaterar från filen. Ersätt allt tar först bort allt som finns på telefonen.</p>
+        <div style="display:grid;gap:8px">
+          <button class="btn primary block" type="button" data-act="import-merge">Slå ihop med det jag har</button>
+          ${store.stocks.size ? '<button class="btn danger block" type="button" data-act="import-replace">Ersätt allt</button>' : ""}
+        </div>`, { kind: "import" });
+    };
+    reader.onerror = () => toast("Kunde inte läsa filen.");
+    reader.readAsText(file, "utf-8");
+  });
+
+  document.addEventListener("click", e => {
+    const t = e.target.closest("button");
+    if (!t) return;
+    if (t.dataset.open) { go("s-" + t.dataset.open); return; }
+    if (t.dataset.trade) {
+      const s = store.stocks.get(route.id); const tr = s?.trades.find(x => x.id === t.dataset.trade);
+      if (s && tr) tradeSheet(s, tr);
+      return;
+    }
+    if (t.dataset.type && tf) {
+      tf.type = t.dataset.type; syncTradeInputs(false); updateTradePreview(); return;
+    }
+    const act = t.dataset.act;
+    if (!act) return;
+    const s = route.view === "stock" ? store.stocks.get(route.id) : null;
+    if (act === "close") closeSheet();
+    else if (act === "export") exportCsv();
+    else if (act === "import") { const f = $("importFile"); f.value = ""; f.click(); }
+    else if ((act === "import-merge" || act === "import-replace") && pendingImport) {
+      if (act === "import-replace" && !t.classList.contains("armed")) { t.classList.add("armed"); t.textContent = "Tryck igen för att ersätta allt"; return; }
+      const n = pendingImport.length;
+      store.importStocks(pendingImport, act === "import-replace");
+      pendingImport = null; closeSheet(); go("");
+      toast(`Importerade ${n} ${n === 1 ? "aktie" : "aktier"}`);
+    }
+    else if (act === "new-stock") stockSheet(null);
+    else if (act === "example") addExample();
+    else if (act === "edit-stock" && s) stockSheet(s);
+    else if (act === "save-price" && s) {
+      const v = parseNum($("curPrice").value);
+      const next = { ...s };
+      if (isNaN(v)) { next.currentPrice = null; next.currentPriceDate = ""; toast("Använder senaste transaktionens kurs"); }
+      else if (v <= 0) { toast("Kursen måste vara större än noll."); return; }
+      else { next.currentPrice = v; next.currentPriceDate = today(); toast("Kursen är uppdaterad"); }
+      store.putStock(next);
+    }
+    else if (act === "del-stock" && s) {
+      if (!t.classList.contains("armed")) { t.classList.add("armed"); t.textContent = "Tryck igen för att ta bort allt"; setTimeout(() => { if (t.isConnected) { t.classList.remove("armed"); t.textContent = "Ta bort aktie"; } }, 4000); return; }
+      store.removeStock(s.id); go(""); toast(s.name + " är borttagen");
+    }
+    else if (act === "del-trade" && tf) {
+      if (!tf.armed) { tf.armed = true; t.classList.add("armed"); t.textContent = "Bekräfta"; return; }
+      const st0 = store.stocks.get(tf.stockId);
+      if (st0) store.removeTrade(st0.id, tf.editId);
+      closeSheet(); render(); toast("Transaktionen är borttagen");
+    }
+  });
+
+  document.addEventListener("input", e => {
+    if (!tf || !sheet.contains(e.target)) return;
+    const f = e.target.dataset.f;
+    if (f) {
+      tf.vals[f] = parseNum(e.target.value);
+      tf.order = tf.order.filter(x => x !== f).concat(f);
+      recomputeAuto();
+      syncTradeInputs(false);
+    }
+    updateTradePreview();
+    $("tErr").hidden = true;
+  });
+
+  document.addEventListener("submit", e => {
+    e.preventDefault();
+    if (e.target.id === "stockForm") saveStockForm();
+    if (e.target.id === "tradeForm") saveTradeForm();
+  });
+
+  $("backBtn").addEventListener("click", () => go(""));
+  $("addStockBtn").addEventListener("click", () => stockSheet(null));
+  $("newTradeBtn").addEventListener("click", () => { const s = store.stocks.get(route.id); if (s) tradeSheet(s, null); });
+  window.addEventListener("hashchange", () => { closeSheet(); render(); window.scrollTo(0, 0); });
+
+  let resizeT = 0;
+  window.addEventListener("resize", () => { clearTimeout(resizeT); resizeT = setTimeout(() => { if (route.view === "stock" && sheet.hidden) render(); }, 150); });
+
+  store.onChange(() => {
+    if (!sheet.hidden && sheetCtx?.kind === "trade") { updateTradePreview(); return; }
+    const y = window.scrollY; render(); window.scrollTo(0, y);
+  });
+  window.__aktiedagbokStarted = true;
+  store.load();
+  if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => { });
+})();
+</script>
+</body>
+</html>
