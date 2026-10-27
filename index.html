@@ -168,6 +168,7 @@ a { color: var(--accent); }
 .backup { display: grid; gap: 10px; }
 .backup .btns { display: flex; gap: 8px; flex-wrap: wrap; }
 .backup .btns .btn { flex: 1 1 140px; }
+.usd { display: block; font-size: 12px; color: var(--muted); }
 .version { font-size: 12px; color: var(--muted); text-align: center; }
 </style>
 </head>
@@ -218,7 +219,7 @@ a { color: var(--accent); }
 <script>
 (() => {
   "use strict";
-  const VERSION = "Version 1 · 27 okt 2026";
+  const VERSION = "Version 2 · 27 okt 2026";
 
   const nf = (min, max) => new Intl.NumberFormat("sv-SE", { minimumFractionDigits: min, maximumFractionDigits: max });
   const f0 = nf(0, 0), f2 = nf(2, 2), fq = nf(0, 4), fk = nf(0, 2);
@@ -231,6 +232,28 @@ a { color: var(--accent); }
   const parseNum = s => { if (s == null) return NaN; const t = String(s).replace(/\s| /g, "").replace(/−/g, "-").replace(",", "."); return t === "" ? NaN : Number(t); };
   const inNum = n => (Number.isFinite(n) ? String(round(n, 4)).replace(".", ",") : "");
   const today = () => { const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); };
+  const fu = nf(2, 4);
+  const usd = n => fu.format(round(n, 4)) + " USD";
+  const FX_KEY = "aktiedagbok.fx";
+  let fxCache = {};
+  try { fxCache = JSON.parse(localStorage.getItem(FX_KEY) || "{}") || {}; } catch (e) { fxCache = {}; }
+  const fxPending = {};
+  // SEK per USD for a date, from the ECB reference rates via Frankfurter. Weekends get the latest business day before.
+  function fetchFx(date) {
+    if (fxCache[date] > 0) return Promise.resolve(fxCache[date]);
+    if (fxPending[date]) return fxPending[date];
+    const p = fetch("https://api.frankfurter.dev/v1/" + date + "?base=USD&symbols=SEK")
+      .then(r => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+      .then(j => {
+        const v = Number(j && j.rates && j.rates.SEK);
+        if (!(v > 0)) throw new Error("Ingen kurs");
+        if (date < today()) { fxCache[date] = v; try { localStorage.setItem(FX_KEY, JSON.stringify(fxCache)); } catch (e) { } }
+        return v;
+      })
+      .finally(() => { delete fxPending[date]; });
+    fxPending[date] = p;
+    return p;
+  }
   const fmtDate = iso => { if (!iso) return ""; const d = new Date(iso + "T12:00:00"); return d.toLocaleDateString("sv-SE", { day: "numeric", month: "short", year: "numeric" }); };
   const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
 
@@ -473,11 +496,11 @@ a { color: var(--accent); }
           <span class="date">${esc(fmtDate(t.date))}</span>
         </span>
         <dl>
-          <div><dt>Kurs</dt><dd>${esc(kr(t.price, 2))}</dd></div>
+          <div><dt>Kurs</dt><dd>${esc(kr(t.price, 2))}${t.fx > 0 ? `<span class="usd">${esc(usd(t.price / t.fx))}</span>` : ""}</dd></div>
           <div><dt>Ägda efter</dt><dd>${esc(st(r.sharesAfter))}</dd></div>
           <div><dt>Balans sedan start</dt><dd class="${cls(r.balanceAfter)}">${esc(kr(r.balanceAfter))}</dd></div>
         </dl>
-        ${Number(t.fee) ? `<span class="note">Courtage ${esc(kr(t.fee))}</span>` : ""}
+        ${Number(t.fee) || t.fx > 0 ? `<span class="note">${[Number(t.fee) ? "Courtage " + esc(kr(t.fee)) : "", t.fx > 0 ? "Växelkurs " + esc(fq.format(round(t.fx, 4))) + " kr/USD" + (t.fxManual ? " (egen)" : " (ECB)") : ""].filter(Boolean).join(" · ")}</span>` : ""}
         ${r.oversell ? `<span class="note neg">Sålde fler aktier än du ägde enligt historiken.</span>` : ""}
         ${t.note ? `<span class="note">${esc(t.note)}</span>` : ""}
       </button>`;
@@ -570,6 +593,7 @@ a { color: var(--accent); }
       type: trade?.type || "buy",
       order: trade ? ["qty", "price"] : (seedPrice ? ["price"] : []),
       vals: { amount: trade?.amount ?? NaN, qty: trade?.qty ?? NaN, price: seedPrice || NaN },
+      fx: trade?.fx > 0 ? trade.fx : NaN, fxManual: !!(trade?.fxManual && trade.fx > 0),
       armed: false
     };
     openSheet(`
@@ -594,7 +618,18 @@ a { color: var(--accent); }
             <input class="n" id="tPrice" data-f="price" inputmode="decimal" autocomplete="off" placeholder="10,00">
           </div>
         </div>
-        <p class="hint" style="margin:-6px 0 0">Fyll i två av tre fält, så räknas det tredje ut.${!trade && seedPrice ? " Kursen är förifylld från " + (Number(stock.currentPrice) > 0 ? "aktuell kurs" : "din senaste transaktion") + "." : ""}</p>
+        <div class="grid2">
+          <div class="field">
+            <label for="tUsd">Kurs (USD)</label>
+            <input class="n" id="tUsd" inputmode="decimal" autocomplete="off" placeholder="0,95">
+          </div>
+          <div class="field">
+            <label for="tFx">Växelkurs (kr/USD) <span class="autotag" id="fxTag" hidden>ECB</span></label>
+            <input class="n" id="tFx" inputmode="decimal" autocomplete="off" placeholder="10,50">
+          </div>
+        </div>
+        <p class="hint" id="fxHint" style="margin:-6px 0 0"></p>
+        <p class="hint" style="margin:-6px 0 0">Fyll i två av belopp, antal och kurs, så räknas det tredje ut.${!trade && seedPrice ? " Kursen är förifylld från " + (Number(stock.currentPrice) > 0 ? "aktuell kurs" : "din senaste transaktion") + "." : ""}</p>
         <div class="grid2">
           <div class="field"><label for="tDate">Datum</label><input id="tDate" type="date" value="${esc(trade?.date || today())}"></div>
           <div class="field"><label for="tFee">Courtage (kr)</label><input class="n" id="tFee" inputmode="decimal" autocomplete="off" placeholder="0" value="${trade && Number(trade.fee) ? esc(inNum(trade.fee)) : ""}"></div>
@@ -609,7 +644,42 @@ a { color: var(--accent); }
         </div>
       </form>`, { kind: "trade" });
     syncTradeInputs(true);
+    syncFx(null);
+    if (!tf.fxManual) loadFormFx();
     updateTradePreview();
+  }
+  // When the price was typed in USD, keep the USD price fixed and move the SEK price with the exchange rate.
+  function applyUsdAnchor() {
+    if (!tf || tf.priceFrom !== "usd" || !(tf.usd > 0) || !(tf.fx > 0)) return;
+    tf.vals.price = round(tf.usd * tf.fx, 4);
+    tf.order = tf.order.filter(x => x !== "price").concat("price");
+    recomputeAuto();
+    syncTradeInputs(false);
+    $("tPrice").value = inNum(tf.vals.price);
+  }
+  function fxHint(msg) { const h = $("fxHint"); if (h) h.textContent = msg; }
+  function syncFx(editing) {
+    if (!tf || !$("tFx")) return;
+    const fx = tf.fx, price = tf.vals.price;
+    if (editing !== "fx") $("tFx").value = fx > 0 ? inNum(fx) : "";
+    if (editing !== "usd") $("tUsd").value = fx > 0 && price > 0 ? inNum(round(price / fx, 4)) : "";
+    $("fxTag").hidden = !(fx > 0 && !tf.fxManual);
+    $("tFx").classList.toggle("auto", fx > 0 && !tf.fxManual);
+    if (tf.fxManual && fx > 0) fxHint("Egen växelkurs. Töm fältet för att använda ECB:s kurs för datumet.");
+    else if (fx > 0) fxHint("ECB:s växelkurs för datumet. Skriv en egen om din bank använde en annan.");
+  }
+  function loadFormFx() {
+    const date = $("tDate").value || today();
+    const ctx = tf;
+    fxHint("Hämtar växelkurs för " + fmtDate(date) + " …");
+    fetchFx(date).then(v => {
+      if (tf !== ctx || tf.fxManual || ($("tDate") && $("tDate").value !== date)) return;
+      tf.fx = v; applyUsdAnchor(); syncFx(null); updateTradePreview();
+    }).catch(() => {
+      if (tf !== ctx || tf.fxManual) return;
+      tf.fx = NaN; syncFx(null);
+      fxHint("Kunde inte hämta växelkursen just nu. Fyll i den själv om du vill, den är valfri.");
+    });
   }
 
   const FIELDS = ["amount", "qty", "price"];
@@ -644,7 +714,8 @@ a { color: var(--accent); }
     return {
       id: tf.editId || uid(), type: tf.type, amount: v.amount, qty: v.qty, price: v.price,
       fee: Math.max(0, parseNum($("tFee").value) || 0), date: $("tDate").value || today(),
-      note: $("tNote").value.trim()
+      note: $("tNote").value.trim(),
+      fx: tf.fx > 0 ? round(tf.fx, 6) : null, fxManual: !!(tf.fxManual && tf.fx > 0)
     };
   }
   function updateTradePreview() {
@@ -715,15 +786,15 @@ a { color: var(--accent); }
     go("s-" + s.id);
   }
 
-  const CSV_HEAD = ["Rad", "Aktie-ID", "Aktie", "Kortnamn", "Ägda vid start", "Kostnad vid start", "Aktuell kurs", "Kurs uppdaterad", "Transaktions-ID", "Typ", "Datum", "Belopp", "Antal", "Kurs", "Courtage", "Anteckning", "Skapad"];
+  const CSV_HEAD = ["Rad", "Aktie-ID", "Aktie", "Kortnamn", "Ägda vid start", "Kostnad vid start", "Aktuell kurs", "Kurs uppdaterad", "Transaktions-ID", "Typ", "Datum", "Belopp", "Antal", "Kurs", "Courtage", "Anteckning", "Skapad", "Växelkurs (kr/USD)", "Egen växelkurs", "Kurs (USD)"];
   function toCsv() {
     const n = v => (v === null || v === undefined || v === "" || !isFinite(Number(v))) ? "" : String(Number(v)).replace(".", ",");
     const txt = v => { const s = String(v ?? ""); return /^[=+\-@]/.test(s) ? "'" + s : s; };
     const q = v => { const s = String(v ?? ""); return /[;"\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
     const lines = [CSV_HEAD];
     [...store.stocks.values()].sort((a, b) => a.name.localeCompare(b.name, "sv")).forEach(s => {
-      lines.push(["Aktie", s.id, txt(s.name), txt(s.ticker), n(s.startShares), n(s.startCost), n(s.currentPrice), s.currentPriceDate || "", "", "", "", "", "", "", "", "", n(s.created)]);
-      sortTrades(s.trades).forEach(t => lines.push(["Affär", s.id, txt(s.name), txt(s.ticker), "", "", "", "", t.id, t.type === "sell" ? "Sälj" : "Köp", t.date, n(t.amount), n(t.qty), n(t.price), n(t.fee), txt(t.note), n(t.created)]));
+      lines.push(["Aktie", s.id, txt(s.name), txt(s.ticker), n(s.startShares), n(s.startCost), n(s.currentPrice), s.currentPriceDate || "", "", "", "", "", "", "", "", "", n(s.created), "", "", ""]);
+      sortTrades(s.trades).forEach(t => lines.push(["Affär", s.id, txt(s.name), txt(s.ticker), "", "", "", "", t.id, t.type === "sell" ? "Sälj" : "Köp", t.date, n(t.amount), n(t.qty), n(t.price), n(t.fee), txt(t.note), n(t.created), n(t.fx), t.fx > 0 && t.fxManual ? "ja" : "", t.fx > 0 ? n(round(t.price / t.fx, 4)) : ""]));
     });
     return "﻿" + lines.map(r => r.map(q).join(";")).join("\r\n") + "\r\n";
   }
@@ -787,6 +858,8 @@ a { color: var(--accent); }
         date: date(get(r, "Datum")), amount: num(get(r, "Belopp")), qty: num(get(r, "Antal")), price: num(get(r, "Kurs")),
         fee: num(get(r, "Courtage")) || 0, note: unq(get(r, "Anteckning")), created: num(get(r, "Skapad")) || Date.now() + i
       };
+      const fx = num(get(r, "Växelkurs (kr/USD)"));
+      if (fx > 0) { t.fx = fx; t.fxManual = get(r, "Egen växelkurs").toLowerCase() === "ja"; }
       if (!(t.amount > 0) && t.qty > 0 && t.price > 0) t.amount = round(t.qty * t.price, 2);
       if (!(t.qty > 0) && t.amount > 0 && t.price > 0) t.qty = round(t.amount / t.price, 4);
       if (!(t.price > 0) && t.amount > 0 && t.qty > 0) t.price = round(t.amount / t.qty, 4);
@@ -870,11 +943,26 @@ a { color: var(--accent); }
   document.addEventListener("input", e => {
     if (!tf || !sheet.contains(e.target)) return;
     const f = e.target.dataset.f;
+    const id = e.target.id;
     if (f) {
       tf.vals[f] = parseNum(e.target.value);
+      tf.priceFrom = "sek";
       tf.order = tf.order.filter(x => x !== f).concat(f);
       recomputeAuto();
       syncTradeInputs(false);
+      syncFx(null);
+    } else if (id === "tUsd") {
+      const u = parseNum(e.target.value);
+      tf.usd = u; tf.priceFrom = "usd";
+      if (tf.fx > 0 && u > 0) applyUsdAnchor();
+      else if (!(tf.fx > 0)) fxHint("Fyll i växelkursen först, så räknas kursen i kronor ut.");
+      syncFx("usd");
+    } else if (id === "tFx") {
+      const v = parseNum(e.target.value);
+      if (isNaN(v)) { tf.fxManual = false; tf.fx = NaN; syncFx("fx"); loadFormFx(); }
+      else { tf.fxManual = true; tf.fx = v > 0 ? v : NaN; applyUsdAnchor(); syncFx("fx"); }
+    } else if (id === "tDate") {
+      if (!tf.fxManual) loadFormFx();
     }
     updateTradePreview();
     $("tErr").hidden = true;
@@ -898,8 +986,27 @@ a { color: var(--accent); }
     if (!sheet.hidden && sheetCtx?.kind === "trade") { updateTradePreview(); return; }
     const y = window.scrollY; render(); window.scrollTo(0, y);
   });
+  function backfillFx() {
+    const dates = new Set();
+    store.stocks.forEach(s => s.trades.forEach(t => { if (!(t.fx > 0) && t.date && t.date <= today()) dates.add(t.date); }));
+    if (!dates.size) return;
+    Promise.all([...dates].map(d => fetchFx(d).then(v => [d, v], () => [d, null]))).then(pairs => {
+      const got = Object.fromEntries(pairs.filter(p => p[1] > 0));
+      let changed = false;
+      store.stocks.forEach((s, id) => {
+        let touched = false;
+        const trades = s.trades.map(t => (!(t.fx > 0) && got[t.date]) ? (touched = true, { ...t, fx: got[t.date], fxManual: false }) : t);
+        if (touched) { store.stocks.set(id, { ...s, trades }); changed = true; }
+      });
+      if (!changed) return;
+      const flag = store.meta.changedSince;
+      store.save(); store.meta.changedSince = flag; store.saveMeta();
+      store.emit();
+    });
+  }
   window.__aktiedagbokStarted = true;
   store.load();
+  backfillFx();
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => { });
 })();
 </script>

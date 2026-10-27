@@ -1,5 +1,5 @@
 // Network first, so a new version shows up on the next reload. Falls back to the cached copy offline.
-const CACHE = "aktiedagbok-v1";
+const CACHE = "aktiedagbok-v2";
 const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", e => {
